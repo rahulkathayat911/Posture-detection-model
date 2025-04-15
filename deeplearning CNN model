@@ -1,0 +1,204 @@
+import tensorflow as tf
+import numpy as np
+import pandas as pd
+from tensorflow.keras import layers, models
+import matplotlib.pyplot as plt
+
+image_size = (224,224)
+batch_size = 32
+channels = 3
+dataset = tf.keras.preprocessing.image_dataset_from_directory(
+    r"/kaggle/input/yoga-pose-image-classification-dataset/dataset",
+    shuffle=True,
+    image_size= image_size,
+    batch_size=batch_size
+)
+class_names = dataset.class_names
+class_names
+len(dataset)
+for image_batch, lable_batch in dataset.take(1):
+    print(image_batch.shape)
+    print(lable_batch.numpy())
+plt.figure(figsize=(10,10))
+for image_batch, lable_batch in dataset.take(1):
+    for i in range(12):
+        aj = plt.subplot(3,4,i+1)
+        plt.imshow(image_batch[i].numpy().astype("uint8"))
+        plt.axis("off")
+        plt.title(class_names[lable_batch[i]])
+len(dataset)
+# train dataset ==> .8
+# test dataset ==> .1
+# validation dataset ==> .1
+train_ds = .8
+len(dataset)*train_ds
+train_ds = dataset.take(150)
+len(train_ds)
+ 
+test_ds = .1
+len(dataset)*test_ds
+rem_ds = dataset.skip(150)
+len(rem_ds)
+test_ds = rem_ds.take(20)
+len(test_ds)
+val_ds = rem_ds.skip(20)
+len(val_ds)
+def get_dataset_partitions_tf(ds, train_split = .8, test_split = .1, val_split = .1, shuffle = True, Shuffle_size = 10000):
+    ds_size = len(dataset)
+    if shuffle:
+        ds = ds.shuffle(Shuffle_size, seed = 10)
+        train_size = int(train_split*ds_size)
+        val_size = int(val_split * ds_size)
+        
+        train_ds =  ds.take(train_size)
+        val_ds = ds.skip(train_size).take(val_size)
+
+        test_ds =  ds.skip(train_size).skip(val_size)
+
+    return train_ds, test_ds, val_ds
+train_ds, test_ds, val_ds = get_dataset_partitions_tf(dataset)
+train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=tf.data.AUTOTUNE)
+val_ds = val_ds.cache().shuffle(1000).prefetch(buffer_size=tf.data.AUTOTUNE)
+test_ds = test_ds.cache().shuffle(1000).prefetch(buffer_size=tf.data.AUTOTUNE)
+rescale_and_resize = tf.keras.Sequential([
+    layers.Resizing(image_size, image_size),
+    layers.Rescaling(1.0/255)
+])
+data_augmentation = tf.keras.Sequential([
+    layers.RandomFlip("horizontal_and_vertical"),
+    layers.RandomRotation(0.2)
+])
+from keras.layers import Dense, Conv2D, Flatten
+from keras.models import Sequential
+from keras.layers import MaxPooling2D
+input_shape = (224,224,3)
+n_classes = 107
+
+rescale_and_resize
+data_augmentation
+
+model = models.Sequential([
+    layers.Input(shape=input_shape),
+
+    layers.Conv2D(32, (3,3), activation='relu', input_shape = input_shape),
+    layers.MaxPooling2D(pool_size = (2,2)),
+    layers.Conv2D(64, (3,3), activation='relu'),
+    layers.MaxPooling2D(pool_size = (2,2)),
+
+    layers.Conv2D(64, (3,3), activation='relu'),
+    layers.MaxPooling2D(pool_size = (2,2)),
+
+    layers.Conv2D(64, (3,3), activation='relu'),
+    layers.MaxPooling2D(pool_size = (2,2)),
+    layers.Conv2D(64, (3,3), activation='relu'),
+    layers.MaxPooling2D(pool_size = (2,2)),
+    layers.Conv2D(64, (3,3), activation='relu'),
+    layers.MaxPooling2D(pool_size = (2,2)),
+    layers.Flatten(),
+    layers.Dense(64, activation='relu'),
+    layers.Dense(107, activation='softmax')
+
+])
+model.summary()
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+from keras.callbacks import EarlyStopping
+history = model.fit(
+    train_ds,
+    epochs=70,  # Adjust the number of epochs as needed
+    batch_size=batch_size,
+    verbose=1,
+    validation_data=val_ds, 
+    callbacks = EarlyStopping()
+)
+scores = model.evaluate(test_ds)
+scores
+history
+history.params
+history.history.keys()
+history.history['accuracy']
+acc = history.history['accuracy']
+val_acc = history.history['val_accuracy']
+
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+plt.figure(figsize = (8,6))
+plt.subplot(1,2,1)
+plt.plot(range(15), acc, label = "Training accurcay")
+plt.plot(range(15), val_acc, label = "validation accurcay")
+plt.legend(loc='lower right')
+plt.title("training and validation accuracy")
+
+
+
+plt.subplot(1,2,2)
+plt.plot(range(15), loss, label = "Training loss")
+plt.plot(range(15), val_loss, label = "validation loss")
+plt.legend(loc='lower right')
+plt.title("training and validation loss")
+for image_batch, lable_batch in test_ds.take(1):
+    first_image = image_batch[0].numpy().astype('uint8')
+    plt.axis('off')
+    first_lable = lable_batch[0].numpy()
+
+    print("first image to predict")
+    plt.imshow(first_image)
+    print("actual:  ", class_names[first_lable])
+
+    batch_prediction = model.predict(image_batch)
+    print("predicted lable: ", class_names[np.argmax(batch_prediction[0])])
+np.argmax([0.01005353 ,0.01295436 ,0.0075977  ,0.00833228 ,0.0069009 ,0.00930806
+ ,0.00672985 ,0.00934636 ,0.01107434 ,0.00737152 ,0.00948556 ,0.00641354
+ ,0.01037119 ,0.01230495 ,0.00895551 ,0.00951588 ,0.00701862 ,0.00945261
+ ,0.00716201 ,0.0094677  ,0.00874102 ,0.01268603 ,0.01001662 ,0.01128786
+ ,0.01443651 ,0.00886651 ,0.00695035 ,0.00640645 ,0.01100443 ,0.01152733
+ ,0.010438   ,0.0062984  ,0.00917971 ,0.00855381 ,0.00593155 ,0.01147451
+ ,0.01129986 ,0.01024758 ,0.00550684 ,0.00895474 ,0.00994025 ,0.0092472
+ ,0.00673936 ,0.00872781 ,0.0077678  ,0.00838942 ,0.00833421 ,0.00967538
+ ,0.00809391 ,0.00954863 ,0.0108016  ,0.00761538 ,0.01100258 ,0.00505607
+ ,0.01020807 ,0.00888352 ,0.01068117 ,0.00815324 ,0.00767512 ,0.01201592
+ ,0.0116909  ,0.00590598 ,0.00852671 ,0.00853512 ,0.00906511 ,0.00898509
+ ,0.0106136  ,0.00808791 ,0.00829941 ,0.01193968 ,0.00855971 ,0.00785171
+ ,0.00918498 ,0.01166796 ,0.01004596 ,0.01034119 ,0.00985178 ,0.00704273
+ ,0.01229843 ,0.01072182 ,0.00814369 ,0.00860259 ,0.00860192 ,0.00664316
+ ,0.01079345 ,0.01120564 ,0.00769235 ,0.01231263 ,0.00909372 ,0.01177197
+ ,0.00928426 ,0.01042115 ,0.01123673 ,0.00895676 ,0.01145402 ,0.00935732
+ ,0.01139569 ,0.00933559 ,0.0104931  ,0.0097795  ,0.01183793 ,0.0082053
+ ,0.00948342 ,0.00773753 ,0.00925604 ,0.01133268 ,0.00817494])
+def predict (model, img):
+    img_array = tf.keras.preprocessing.image.img_to_array(images[i].numpy())
+    img_array = tf.expand_dims(img_array, 0) #create batch
+    
+    
+    predictions = model.predict(img_array)
+
+    predicted_class =class_names[np.argmax(predictions[0])]
+    confidence = round(100 * (np.max(predictions[0])), 2)
+    return predicted_class, confidence
+plt.figure(figsize=(15,15))
+for images, lables in test_ds.take(1):
+    for i in range(9):
+        ax = plt.subplot(3,3,i+1)
+        plt.imshow(images[i].numpy().astype("uint8")) 
+        predicted_class, confidence = predict(model, images[i].numpy())
+        actual_class = class_names[lables[i]]
+        plt.title(f"Actual: , {actual_class}, \n predicted: {predicted_class}, \nConfidece: {confidence}")
+        plt.axis('off')
+import os
+
+# Define the directory
+directory = "/kaggle/input/yoga-pose-image-classification-dataset/dataset"
+
+# Get a list of files and filter out non-integer filenames
+files = [f for f in os.listdir(directory) if f.isdigit()]
+
+# Convert filenames to integers and find the maximum
+if files:
+    model_version = max([int(f) for f in files]) + 1
+else:
+    model_version = 1  # Start from 1 if no numeric filenames are found
+
+# Save the model with the new version number and a valid file extension
+model.save(f"{directory}/{model_version}.keras")
+**> > # Can train model more for accurate predictions, i use early stopping that's why model train for 15 epochs only.....
